@@ -310,6 +310,11 @@ struct jpeg_input_controller {
   /* State variables made visible to other modules */
   boolean has_multiple_scans;   /* True if file has multiple scans */
   boolean eoi_reached;          /* True when EOI has been consumed */
+  /* Scan-by-scan preview support: TRUE between the completion of the current
+   * input scan (JPEG_SCAN_COMPLETED) and the consumption of the following
+   * SOS/EOI marker.  Used to resume marker reading across a suspension.
+   */
+  boolean scan_completed_pending;
 };
 
 /* Main buffer control (downsampled-data buffer) */

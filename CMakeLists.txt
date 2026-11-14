@@ -1962,6 +1962,28 @@ if(WITH_TURBOJPEG)
       ${CMAKE_CURRENT_BINARY_DIR}/test/tjcomptest
       ${CMAKE_CURRENT_BINARY_DIR}/test/tjdecomptest
       ${CMAKE_CURRENT_BINARY_DIR}/test/tjtrantest)
+
+  # Scan-by-scan progressive preview regression test.  A progressive JPEG is
+  # generated from the reference PPM at test time so no binary fixture needs
+  # to be checked in.
+  add_executable(scantest-static test/scantest.c)
+  target_include_directories(scantest-static PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_link_libraries(scantest-static jpeg-static)
+  add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test/scantest-prog.jpg
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+      ${CMAKE_CURRENT_BINARY_DIR}/test
+    COMMAND cjpeg-static -progressive -quality 90
+      -outfile ${CMAKE_CURRENT_BINARY_DIR}/test/scantest-prog.jpg
+      ${TESTIMAGES}/testorig.ppm
+    DEPENDS cjpeg-static ${TESTIMAGES}/testorig.ppm
+    COMMENT "Generating progressive JPEG for scantest")
+  add_custom_target(scantest-prog-jpg ALL
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/test/scantest-prog.jpg)
+  add_test(NAME scantest
+    COMMAND scantest-static
+      ${CMAKE_CURRENT_BINARY_DIR}/test/scantest-prog.jpg
+      ${TESTIMAGES}/testorig.jpg)
 endif()
 
 endif() # WITH_TESTS

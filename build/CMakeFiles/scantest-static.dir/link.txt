@@ -1,0 +1,1 @@
+/usr/bin/cc -O3 -DNDEBUG "CMakeFiles/scantest-static.dir/test/scantest.c.o" -o scantest-static  libjpeg.a 

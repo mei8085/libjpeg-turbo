@@ -548,6 +548,19 @@ struct jpeg_decompress_struct {
   boolean buffered_image;       /* TRUE=multiple output passes */
   boolean raw_data_out;         /* TRUE=downsampled data wanted */
 
+  /* TRUE=use the scan-by-scan preview entry point
+   * (jpeg_read_scan_preview()).  This is an 8-bit-lossy-only, opt-in mode
+   * that drives the buffered-image pipeline internally and delivers a
+   * rendered image only at completed-scan boundaries.
+   */
+  boolean scan_preview;
+  /* Sticky flag set by jpeg_read_scan_preview() once the entropy decoder has
+   * reported insufficient/truncated data for the current or a prior scan.
+   * Read-only to the application; reset when decompression parameters are
+   * (re)initialized.
+   */
+  boolean preview_truncated;
+
   J_DCT_METHOD dct_method;      /* IDCT algorithm selector */
   boolean do_fancy_upsampling;  /* TRUE=apply fancy upsampling */
   boolean do_block_smoothing;   /* TRUE=apply interblock smoothing */
@@ -1112,6 +1125,25 @@ EXTERN(int) jpeg_consume_input(j_decompress_ptr cinfo);
 #define JPEG_REACHED_EOI        2 /* Reached end of image */
 #define JPEG_ROW_COMPLETED      3 /* Completed one iMCU row */
 #define JPEG_SCAN_COMPLETED     4 /* Completed last iMCU row of a scan */
+
+/* Scan-by-scan preview entry point (8-bit lossy JPEG only).
+ *
+ * Drives the buffered-image pipeline internally and renders the complete
+ * image into scanlines[] only when an entire input scan has been received.
+ * Re-call this routine each time more source data has been appended to a
+ * suspending data source.  The output buffer is never modified on the
+ * "suspended" return path, so the previously delivered preview remains
+ * stable while waiting for more data.
+ */
+EXTERN(int) jpeg_read_scan_preview(j_decompress_ptr cinfo,
+                                   JSAMPARRAY scanlines,
+                                   JDIMENSION max_lines);
+/* Return value is one of: */
+#define JPEG_PREVIEW_SUSPENDED   0 /* Need more input data; buffer unchanged */
+#define JPEG_PREVIEW_SCAN_READY  1 /* A complete scan was rendered */
+#define JPEG_PREVIEW_EOI         2 /* End of image; final image rendered */
+#define JPEG_PREVIEW_TRUNCATED   3 /* Stream ended early; buffer holds the
+                                     best preview from a complete scan */
 
 /* Precalculate output dimensions for current decompression parameters. */
 #if JPEG_LIB_VERSION >= 80

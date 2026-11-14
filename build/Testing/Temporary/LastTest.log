@@ -1,0 +1,20 @@
+Start testing: Nov 14 02:40 UTC
+----------------------------------------------------------
+665/665 Testing: scantest
+665/665 Test: scantest
+Command: "/srv/fb2/mei8085/0033-libjpeg-turbo-1-1379b353/build/scantest-static" "/srv/fb2/mei8085/0033-libjpeg-turbo-1-1379b353/build/test/scantest-prog.jpg" "/srv/fb2/mei8085/0033-libjpeg-turbo-1-1379b353/testimages/testorig.jpg"
+Directory: /srv/fb2/mei8085/0033-libjpeg-turbo-1-1379b353/build
+"scantest" start time: Nov 14 02:40 UTC
+Output:
+----------------------------------------------------------
+Corrupt JPEG data: premature end of data segment
+PASS
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"scantest" end time: Nov 14 02:40 UTC
+"scantest" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 14 02:40 UTC

@@ -2357,6 +2357,57 @@ and repeat the call.  Applications that use non-suspending data sources need
 not check the return values of these three routines.
 
 
+Scan-by-scan preview
+--------------------
+
+For applications that receive a multi-scan (progressive) JPEG incrementally
+and simply want one rendered image each time a whole scan completes, the
+library provides a self-contained entry point that drives the buffered-image
+machinery described above:
+
+        int jpeg_read_scan_preview(j_decompress_ptr cinfo,
+                                   JSAMPARRAY scanlines,
+                                   JDIMENSION max_lines);
+
+To use it, set cinfo.scan_preview = TRUE after jpeg_read_header() and before
+jpeg_start_decompress(), then provide an output buffer holding at least
+cinfo.output_height rows (max_lines must be no smaller than that).  The field
+is opt-in: leaving it FALSE preserves every existing code path unchanged.
+Internally the decoder uses the full-buffer (buffered-image) pipeline, so the
+coefficients of each completed scan are retained independently of output.
+
+After jpeg_start_decompress(), call jpeg_read_scan_preview() each time more
+source bytes may have arrived.  It returns one of:
+
+* JPEG_PREVIEW_SUSPENDED (0): not enough data has arrived to finish a scan.
+  No scan boundary was reached and the output buffer is not modified, so the
+  previously rendered preview remains pixel-stable.  Load more data and call
+  again.
+* JPEG_PREVIEW_SCAN_READY (1): a whole scan has just completed and been
+  rendered into scanlines[].  The image reflects exactly that scan; the
+  half-received next scan can never appear in the output.  Call again to
+  continue.
+* JPEG_PREVIEW_EOI (2): the final scan has completed and the end-of-image
+  marker was reached.  The rendered image is byte-for-byte identical to a
+  conventional one-shot jpeg_start_decompress()/jpeg*_read_scanlines()
+  decoding of the same file, because both use the same IDCT, upsampling, and
+  color-conversion modules.
+* JPEG_PREVIEW_TRUNCATED (3): the entropy data of the current scan ran out
+  before its terminating marker (the decoder had to pad the remaining MCUs).
+  That degraded scan is not delivered; the buffer still holds the last
+  genuinely complete scan's image.  This lets the caller distinguish "still
+  waiting for more data" (JPEG_PREVIEW_SUSPENDED) from "the stream ended
+  early and cannot continue" (JPEG_PREVIEW_TRUNCATED).
+
+The routine is fully reentrant across I/O suspension: every internal
+suspension leaves both the input position and the DSTATE_* machine state at a
+restart point, and repeating the call after supplying more bytes resumes in
+place without re-rendering or corrupting the caller's buffer.  A single-scan
+(baseline) JPEG works as well: it produces exactly one preview that equals
+the one-shot output and then reports JPEG_PREVIEW_EOI.  This entry point is
+available only for the 8-bit data precision build.
+
+
 It is possible to change decoding parameters between output passes in the
 buffered-image mode.  The decoder library currently supports only very
 limited changes of parameters.  ONLY THE FOLLOWING parameter changes are

@@ -718,7 +718,7 @@ master_selection(j_decompress_ptr cinfo)
 
     /* Initialize principal buffer controllers. */
     use_c_buffer = cinfo->inputctl->has_multiple_scans ||
-                   cinfo->buffered_image;
+                   cinfo->buffered_image || cinfo->scan_preview;
     if (cinfo->data_precision == 12)
       j12init_d_coef_controller(cinfo, use_c_buffer);
     else

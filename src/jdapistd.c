@@ -55,10 +55,17 @@ GLOBAL(boolean)
 jpeg_start_decompress(j_decompress_ptr cinfo)
 {
   if (cinfo->global_state == DSTATE_READY) {
-    /* First call: initialize master control, select active modules */
+    /* First call: initialize master control, select active modules.
+     * Scan-preview mode drives the buffered-image pipeline internally, so it
+     * enables the same full-buffer machinery and state machine.
+     */
+    if (cinfo->scan_preview)
+      cinfo->buffered_image = TRUE;
     jinit_master_decompress(cinfo);
     if (cinfo->buffered_image) {
-      /* No more work here; expecting jpeg_start_output next */
+      /* No more work here; expecting jpeg_start_output (or
+       * jpeg_read_scan_preview in scan-preview mode) next.
+       */
       cinfo->global_state = DSTATE_BUFIMAGE;
       return TRUE;
     }
@@ -814,6 +821,178 @@ jpeg_finish_output(j_decompress_ptr cinfo)
   }
   cinfo->global_state = DSTATE_BUFIMAGE;
   return TRUE;
+}
+
+
+/*
+ * Scan-by-scan preview entry point.
+ *
+ * This is a self-contained driver around the buffered-image primitives.  On
+ * each call it:
+ *
+ *   1. Absorbs source data via jpeg_consume_input() until either the data
+ *      source suspends (JPEG_SUSPENDED) or a whole scan has been consumed
+ *      into the coefficient buffer (the next SOS marker or EOI is reached).
+ *      A suspension is reported back WITHOUT touching scanlines[], so the
+ *      caller's previously rendered preview stays pixel-stable.
+ *   2. Only when a complete scan is available does it run an output pass
+ *      (jpeg_start_output/jpeg_read_scanlines/jpeg_finish_output), rendering
+ *      that scan's full image into the caller's buffer.  Coefficients of a
+ *      half-received scan are thus never delivered.
+ *
+ * The routine is reentrant across suspensions: the input/output interlock and
+ * the DSTATE_* states maintained by the lower-level routines remember exactly
+ * where processing stopped, and a subsequent call resumes in place.
+ *
+ * Returns one of the JPEG_PREVIEW_* codes.
+ */
+
+GLOBAL(int)
+jpeg_read_scan_preview(j_decompress_ptr cinfo, JSAMPARRAY scanlines,
+                       JDIMENSION max_lines)
+{
+  int target_scan = 0;
+  boolean last_scan_degraded = FALSE;
+  int event;
+  JDIMENSION row_ctr;
+
+  if (cinfo->data_precision != BITS_IN_JSAMPLE)
+    ERREXIT1(cinfo, JERR_BAD_PRECISION, cinfo->data_precision);
+  if (!cinfo->scan_preview)
+    ERREXIT1(cinfo, JERR_BAD_STATE, cinfo->global_state);
+  if (cinfo->raw_data_out)
+    ERREXIT(cinfo, JERR_NOTIMPL);
+  /* Scan preview relies on the lossy full-coefficient-buffer pipeline. */
+  if (cinfo->master != NULL && cinfo->master->lossless)
+    ERREXIT(cinfo, JERR_NOTIMPL);
+  if (cinfo->global_state != DSTATE_BUFIMAGE &&
+      cinfo->global_state != DSTATE_PRESCAN &&
+      cinfo->global_state != DSTATE_SCANNING &&
+      cinfo->global_state != DSTATE_BUFPOST)
+    ERREXIT1(cinfo, JERR_BAD_STATE, cinfo->global_state);
+  if (max_lines < cinfo->output_height)
+    ERREXIT(cinfo, JERR_BUFFER_SIZE);
+
+  /* If a previous call already reached the end of the image, the final image
+   * remains in the caller's buffer.  Keep reporting the terminal status
+   * without re-rendering (and therefore without touching the buffer).
+   */
+  if (cinfo->global_state == DSTATE_BUFIMAGE &&
+      cinfo->inputctl->eoi_reached)
+    return cinfo->preview_truncated ? JPEG_PREVIEW_TRUNCATED :
+                                      JPEG_PREVIEW_EOI;
+
+  /* A previous call may have rendered the full image and suspended inside
+   * jpeg_finish_output() while reading inter-scan/EOI markers.  Finish that
+   * pending output pass before doing anything else.
+   */
+  if (cinfo->global_state == DSTATE_BUFPOST) {
+    if (!jpeg_finish_output(cinfo))
+      return JPEG_PREVIEW_SUSPENDED;
+    return cinfo->preview_truncated ? JPEG_PREVIEW_TRUNCATED :
+           (cinfo->inputctl->eoi_reached ? JPEG_PREVIEW_EOI :
+                                           JPEG_PREVIEW_SCAN_READY);
+  }
+
+  /* A suspended output-pass setup (DSTATE_PRESCAN) or an in-progress render
+   * (DSTATE_SCANNING) resumes directly; the input boundary and target scan
+   * were already established.  Only DSTATE_BUFIMAGE starts a fresh cycle.
+   */
+  if (cinfo->global_state == DSTATE_BUFIMAGE) {
+    /* Phase 1: drive the input side up to a completed-scan boundary.
+     *
+     * A scan is "complete" once consume_data() reports JPEG_SCAN_COMPLETED.
+     * The following jpeg_consume_input() reads the inter-scan markers and
+     * reports JPEG_REACHED_SOS or JPEG_REACHED_EOI.
+     * scan_completed_pending lets us resume that marker read across a
+     * suspension.  Only the fully received scan is rendered, so a
+     * half-received next scan can never leak into the output.
+     */
+    if (!cinfo->inputctl->scan_completed_pending) {
+      /* Advance through the scan's entropy data until it completes. */
+      for (;;) {
+        event = jpeg_consume_input(cinfo);
+        if (event == JPEG_SUSPENDED)
+          return JPEG_PREVIEW_SUSPENDED; /* buffer untouched */
+        if (event == JPEG_SCAN_COMPLETED) {
+          target_scan = cinfo->input_scan_number;
+          last_scan_degraded =
+            (cinfo->entropy != NULL && cinfo->entropy->insufficient_data);
+          break;
+        }
+        if (event == JPEG_REACHED_EOI) {
+          /* Defensive: EOI without a completed scan (empty/abbreviated). */
+          return JPEG_PREVIEW_SUSPENDED;
+        }
+        /* JPEG_REACHED_SOS and JPEG_ROW_COMPLETED: keep advancing. */
+      }
+    } else {
+      /* Resuming after a suspension while reading the completed scan's
+       * trailing markers; the target scan is the one just completed.
+       */
+      target_scan = cinfo->input_scan_number;
+      last_scan_degraded =
+        (cinfo->entropy != NULL && cinfo->entropy->insufficient_data);
+    }
+
+    /* Read the marker(s) following the completed scan.  This opens the next
+     * scan, reaches EOI, or suspends (scan_completed_pending stays set).
+     */
+    event = jpeg_consume_input(cinfo);
+    if (event == JPEG_SUSPENDED)
+      return JPEG_PREVIEW_SUSPENDED;
+
+    /* The entropy decoder's insufficient_data flag, sampled at the moment
+     * the scan completed, reliably distinguishes a genuine complete scan
+     * (the flag stays FALSE) from one whose entropy data ran out before its
+     * terminating marker (the flag is TRUE and the remaining MCUs were
+     * padded with zeroes).  A degraded scan is not delivered; the previous
+     * complete scan remains the best preview.
+     */
+    if (last_scan_degraded) {
+      cinfo->preview_truncated = TRUE;
+      target_scan--;
+    }
+    if (target_scan < 1)
+      return JPEG_PREVIEW_TRUNCATED; /* no complete scan ever received */
+
+    /* Phase 2a: set up the output pass.  On suspension the state becomes
+     * DSTATE_PRESCAN and a later call resumes via the branch below.
+     */
+    if (!jpeg_start_output(cinfo, target_scan))
+      return JPEG_PREVIEW_SUSPENDED;
+  } else if (cinfo->global_state == DSTATE_PRESCAN) {
+    /* Resume a suspended output-pass setup. */
+    if (!jpeg_start_output(cinfo, cinfo->output_scan_number))
+      return JPEG_PREVIEW_SUSPENDED;
+  }
+
+  /* Phase 2b: render the complete image for the selected scan.  Reached both
+   * by a freshly prepared pass and by a DSTATE_SCANNING re-entry.  Because
+   * the whole target scan is already buffered, this pass only suspends at the
+   * underlying controller's restart points.
+   */
+  while (cinfo->output_scanline < cinfo->output_height) {
+    row_ctr = 0;
+    (*cinfo->main->_process_data) (cinfo,
+                                   scanlines + cinfo->output_scanline,
+                                   &row_ctr,
+                                   cinfo->output_height -
+                                     cinfo->output_scanline);
+    if (row_ctr == 0)
+      return JPEG_PREVIEW_SUSPENDED; /* resume on next call */
+    cinfo->output_scanline += row_ctr;
+  }
+
+  /* Phase 2c: close the output pass and consume markers up to the next
+   * SOS/EOI.  On suspension the state becomes DSTATE_BUFPOST for re-entry.
+   */
+  if (!jpeg_finish_output(cinfo))
+    return JPEG_PREVIEW_SUSPENDED;
+
+  return cinfo->preview_truncated ? JPEG_PREVIEW_TRUNCATED :
+         (cinfo->inputctl->eoi_reached ? JPEG_PREVIEW_EOI :
+                                         JPEG_PREVIEW_SCAN_READY);
 }
 
 #endif /* D_MULTISCAN_FILES_SUPPORTED */

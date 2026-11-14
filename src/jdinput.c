@@ -314,6 +314,10 @@ METHODDEF(void)
 finish_input_pass(j_decompress_ptr cinfo)
 {
   cinfo->inputctl->consume_input = consume_markers;
+  /* The scan's entropy data is fully buffered; the next input operation
+   * reads the inter-scan (or EOI) marker.
+   */
+  cinfo->inputctl->scan_completed_pending = TRUE;
 }
 
 
@@ -340,6 +344,8 @@ consume_markers(j_decompress_ptr cinfo)
 
   switch (val) {
   case JPEG_REACHED_SOS:        /* Found SOS */
+    /* The pending marker following a completed scan has now been read. */
+    inputctl->pub.scan_completed_pending = FALSE;
     if (inputctl->inheaders) {  /* 1st SOS */
       initial_setup(cinfo);
       inputctl->inheaders = FALSE;
@@ -355,6 +361,7 @@ consume_markers(j_decompress_ptr cinfo)
     break;
   case JPEG_REACHED_EOI:        /* Found EOI */
     inputctl->pub.eoi_reached = TRUE;
+    inputctl->pub.scan_completed_pending = FALSE;
     if (inputctl->inheaders) {  /* Tables-only datastream, apparently */
       if (cinfo->marker->saw_SOF)
         ERREXIT(cinfo, JERR_SOF_NO_SOS);
@@ -386,6 +393,7 @@ reset_input_controller(j_decompress_ptr cinfo)
   inputctl->pub.consume_input = consume_markers;
   inputctl->pub.has_multiple_scans = FALSE; /* "unknown" would be better */
   inputctl->pub.eoi_reached = FALSE;
+  inputctl->pub.scan_completed_pending = FALSE;
   inputctl->inheaders = TRUE;
   /* Reset other modules */
   (*cinfo->err->reset_error_mgr) ((j_common_ptr)cinfo);
@@ -420,5 +428,6 @@ jinit_input_controller(j_decompress_ptr cinfo)
    */
   inputctl->pub.has_multiple_scans = FALSE; /* "unknown" would be better */
   inputctl->pub.eoi_reached = FALSE;
+  inputctl->pub.scan_completed_pending = FALSE;
   inputctl->inheaders = TRUE;
 }
