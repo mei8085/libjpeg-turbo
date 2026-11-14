@@ -989,6 +989,15 @@ if(WITH_TESTS)
 
 add_executable(strtest src/strtest.c)
 
+# Hardening test for malicious SOF dimensions/sampling factors, IDCT scaling,
+# buffer-size padding/multiply math, and truncated input.  Links the static
+# TurboJPEG library so it can exercise both the libjpeg and TurboJPEG decode
+# entry points in one process.
+if(WITH_TURBOJPEG AND ENABLE_STATIC)
+  add_executable(jpegsizetest-static src/jpegsizetest.c)
+  target_link_libraries(jpegsizetest-static turbojpeg-static)
+endif()
+
 add_subdirectory(src/md5)
 
 if(GENERATOR_IS_MULTI_CONFIG)
@@ -998,6 +1007,10 @@ else()
 endif()
 
 enable_testing()
+
+if(WITH_TURBOJPEG AND ENABLE_STATIC AND UNIX)
+  add_test(NAME jpegsizetest-static COMMAND jpegsizetest-static)
+endif()
 
 if(WITH_JNA)
   if(WIN32)

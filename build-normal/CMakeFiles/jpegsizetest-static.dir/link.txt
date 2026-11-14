@@ -1,0 +1,1 @@
+/usr/bin/cc -O2 -g -DNDEBUG "CMakeFiles/jpegsizetest-static.dir/src/jpegsizetest.c.o" -o jpegsizetest-static  libturbojpeg.a 

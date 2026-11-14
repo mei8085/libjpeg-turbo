@@ -1,0 +1,112 @@
+Start testing: Nov 14 17:04 UTC
+----------------------------------------------------------
+1/333 Testing: jpegsizetest-static
+1/333 Test: jpegsizetest-static
+Command: "/srv/fb2/mei8085/0065-libjpeg-turbo-8-4b377416/build-normal/jpegsizetest-static"
+Directory: /srv/fb2/mei8085/0065-libjpeg-turbo-8-4b377416/build-normal
+"jpegsizetest-static" start time: Nov 14 17:04 UTC
+Output:
+----------------------------------------------------------
+libjpeg-turbo SOF dimension/sampling/scale hardening test
+
+=== Group A: malicious SOF streams ===
+  [ok] A1 width=65535               -> FATAL (tj:"Invalid argument" / lj:"Maximum supported image dimension")
+  [ok] A2 height=65535              -> FATAL (tj:"Invalid argument" / lj:"Maximum supported image dimension")
+  [ok] A3 width=height=65535        -> FATAL (tj:"Invalid argument" / lj:"Maximum supported image dimension")
+  [ok] A4a width=0                  -> FATAL (tj:"Invalid argument" / lj:"Empty JPEG image")
+  [ok] A4b height=0                 -> FATAL (tj:"Invalid argument" / lj:"Empty JPEG image")
+  [ok] A5a h_samp_factor=0          -> FATAL (tj:"Invalid argument" / lj:"Bogus sampling factors")
+  [ok] A5b v_samp_factor=0          -> FATAL (tj:"Invalid argument" / lj:"Bogus sampling factors")
+  [ok] A6 samp_factor=5             -> FATAL (tj:"Invalid argument" / lj:"Bogus sampling factors")
+  [ok] A7 inconsistent factors      -> FATAL (tj:"Fractional sampling" / lj:"Fractional sampling")
+  [ok] A8 11 components             -> FATAL (tj:"Invalid argument" / lj:"Bogus marker length")
+  [ok] A9 bogus marker length       -> FATAL (tj:"Invalid argument" / lj:"Bogus marker length")
+  [ok] A10 precision=7              -> FATAL (tj:"Invalid argument" / lj:"Unsupported JPEG data precision")
+  [ok] A11 65500x65500 factor4      -> FATAL (tj:"Invalid argument" / lj:"Sampling factors too large")
+  [ok] A11b patched 65501-wide      -> FATAL (tj:"Invalid argument" / lj:"Maximum supported image dimension")
+
+=== Group A12: pixel budget enforced before allocation ===
+  [ok] A12 65500x1 rejected by pixel budget before allocation
+
+=== Group B: buffer-size arithmetic / PAD carry ===
+  [ok] tj3JPEGBufSize 1 444               = 2432
+  [ok] tj3YUVBufSize 1 420 a4             = 16
+  [ok] tjBufSize==tj3JPEGBufSize 1        = 2432
+  [ok] tjBufSizeYUV2==tj3YUVBufSize 1     = 16
+  [ok] tj3JPEGBufSize 7 444               = 2432
+  [ok] tj3YUVBufSize 7 420 a4             = 96
+  [ok] tjBufSize==tj3JPEGBufSize 7        = 2432
+  [ok] tjBufSizeYUV2==tj3YUVBufSize 7     = 96
+  [ok] tj3JPEGBufSize 8 444               = 2432
+  [ok] tj3YUVBufSize 8 420 a4             = 96
+  [ok] tjBufSize==tj3JPEGBufSize 8        = 2432
+  [ok] tjBufSizeYUV2==tj3YUVBufSize 8     = 96
+  [ok] tj3JPEGBufSize 9 444               = 3584
+  [ok] tj3YUVBufSize 9 420 a4             = 200
+  [ok] tjBufSize==tj3JPEGBufSize 9        = 3584
+  [ok] tjBufSizeYUV2==tj3YUVBufSize 9     = 200
+  [ok] tj3JPEGBufSize 15 444              = 3584
+  [ok] tj3YUVBufSize 15 420 a4            = 384
+  [ok] tjBufSize==tj3JPEGBufSize 15       = 3584
+  [ok] tjBufSizeYUV2==tj3YUVBufSize 15    = 384
+  [ok] tj3JPEGBufSize 16 444              = 3584
+  [ok] tj3YUVBufSize 16 420 a4            = 384
+  [ok] tjBufSize==tj3JPEGBufSize 16       = 3584
+  [ok] tjBufSizeYUV2==tj3YUVBufSize 16    = 384
+  [ok] tj3JPEGBufSize 17 444              = 5504
+  [ok] tj3YUVBufSize 17 420 a4            = 576
+  [ok] tjBufSize==tj3JPEGBufSize 17       = 5504
+  [ok] tjBufSizeYUV2==tj3YUVBufSize 17    = 576
+  [ok] tj3JPEGBufSize 31 444              = 8192
+  [ok] tj3YUVBufSize 31 420 a4            = 1536
+  [ok] tjBufSize==tj3JPEGBufSize 31       = 8192
+  [ok] tjBufSizeYUV2==tj3YUVBufSize 31    = 1536
+  [ok] tj3JPEGBufSize 32 444              = 8192
+  [ok] tj3YUVBufSize 32 420 a4            = 1536
+  [ok] tjBufSize==tj3JPEGBufSize 32       = 8192
+  [ok] tjBufSizeYUV2==tj3YUVBufSize 32    = 1536
+  [ok] tj3JPEGBufSize 33 444              = 11648
+  [ok] tj3YUVBufSize 33 420 a4            = 1904
+  [ok] tjBufSize==tj3JPEGBufSize 33       = 11648
+  [ok] tjBufSizeYUV2==tj3YUVBufSize 33    = 1904
+  [ok] planeWidth INT_MAX 420             rejected ("Width is too large")
+  [ok] planeHeight INT_MAX 420            rejected ("Height is too large")
+  [ok] tjPlaneWidth INT_MAX -> -1
+  [ok] tj3YUVBufSize INT_MAX 420          rejected ("too large")
+  [ok] tjBufSizeYUV2 INT_MAX -> (unsigned long)-1
+  [ok] tj3YUVBufSize align=3              rejected ("Invalid argument")
+  [ok] tj3YUVBufSize align=0              rejected ("Invalid argument")
+  [ok] tj3YUVBufSize 37837 align3         rejected ("Invalid argument")
+  [ok] tj3YUVPlaneSize 65536^2 exact      = 4294967296
+
+=== Group C: truncated input ===
+  [ok] C1 empty buffer              -> FATAL (tj:"Invalid argument" / lj:"Empty input file")
+  [ok] C2 cut inside SOF            -> FATAL (tj:"Invalid argument" / lj:"Bogus marker length")
+  [ok] C2b cut at SOF prefix        -> FATAL (tj:"Invalid argument" / lj:"Bogus marker length")
+  [ok] C3 no entropy data           -> WARNING (tj:"Premature end of JPEG file" / lj:"premature end of data segment")
+  [ok] C4 mid-entropy truncation    -> WARNING (tj:"Premature end of JPEG file" / lj:"premature end of data segment")
+  [ok] C5 missing EOI               -> WARNING (tj:"Premature end of JPEG file" / lj:"Premature end of JPEG file")
+
+=== Group D: legal near-boundary images decode ===
+  [ok] D0 65500x1 sub=3 across 16 scaling factors
+  [ok] D1 1x65500 sub=3 across 16 scaling factors
+  [ok] D2 15x15 sub=0 across 16 scaling factors
+  [ok] D3 16x16 sub=0 across 16 scaling factors
+  [ok] D4 17x17 sub=0 across 16 scaling factors
+  [ok] D5 15x17 sub=2 across 16 scaling factors
+  [ok] D6 16x16 sub=2 across 16 scaling factors
+  [ok] D7 17x31 sub=2 across 16 scaling factors
+  [ok] D8 33x9 sub=3 across 16 scaling factors
+
+======================================================
+ALL 214 CHECKS PASSED
+======================================================
+<end of output>
+Test time =   0.21 sec
+----------------------------------------------------------
+Test Passed.
+"jpegsizetest-static" end time: Nov 14 17:04 UTC
+"jpegsizetest-static" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 14 17:04 UTC
