@@ -1,0 +1,1 @@
+/usr/bin/cc -O3 -DNDEBUG "CMakeFiles/trunctest-static.dir/src/trunctest.c.o" -o trunctest-static  libjpeg.a 

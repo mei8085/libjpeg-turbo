@@ -989,6 +989,17 @@ if(WITH_TESTS)
 
 add_executable(strtest src/strtest.c)
 
+# Integration test for decompression suspension, warning recovery, and fatal
+# errors on truncated/chunked entropy-coded streams.
+if(ENABLE_SHARED)
+  add_executable(trunctest src/trunctest.c)
+  target_link_libraries(trunctest jpeg)
+endif()
+if(ENABLE_STATIC)
+  add_executable(trunctest-static src/trunctest.c)
+  target_link_libraries(trunctest-static jpeg-static)
+endif()
+
 add_subdirectory(src/md5)
 
 if(GENERATOR_IS_MULTI_CONFIG)
@@ -1348,6 +1359,8 @@ foreach(libtype ${TEST_LIBTYPES})
   if(UNIX)
     add_test(NAME bmpsizetest-${libtype} COMMAND bmpsizetest${suffix})
   endif()
+
+  add_test(NAME trunctest-${libtype} COMMAND trunctest${suffix})
 
   # These tests are carefully crafted to provide full coverage of as many of
   # the underlying algorithms as possible (including all of the
